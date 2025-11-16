@@ -1,48 +1,58 @@
-// Path: lib/models/item_model.dart
-
 class ItemModel {
-
-  final int? id;
+  final String? id;
+  final String type; // 'lost' or 'found'
+  final String category; // 'Electronics', 'ID/Cards', etc.
   final String title;
+  final String status;
   final String description;
-  final String imageUrl;
+  final String location; // Where item was lost/found
+  final String dateLostFound; // Date: '2024-11-16'
+  final String? imageUrl;
+  final DateTime timeCreated;
 
-  // Constructor
   ItemModel({
     this.id,
+    required this.type,
+    required this.category,
     required this.title,
+    required this.status,
     required this.description,
-    required this.imageUrl,
-  });
+    required this.location,
+    required this.dateLostFound,
+    this.imageUrl,
+    DateTime? timeCreated,
+  }) : timeCreated = timeCreated ?? DateTime.now();
 
-  // 2. Factory Constructor for JSON Deserialization
-  // This converts the Map<String, dynamic> (JSON row from Supabase) into an ItemModel object.
+  // Convert from Supabase JSON to Dart object
   factory ItemModel.fromJson(Map<String, dynamic> json) {
-    // ⚠️ CRITICAL: The string keys (e.g., 'title', 'image_url') MUST exactly match
-    // the column names in your Supabase table.
     return ItemModel(
-      // Ensure 'id' is mapped to your primary key column. It's nullable for new inserts.
-      id: json['id'] as int?,
-
-      // Ensure 'title' matches the column storing the item's main name.
-      // If the column in Supabase is named 'item_name', you must use json['item_name'].
-      title: json['title'] as String,
-
-      // Ensure 'description' matches the corresponding column.
-      description: json['description'] as String,
-
-      // Ensure 'imageUrl' matches the corresponding column.
-      imageUrl: json['image_url'] as String,
+      id: json['id'],
+      type: json['type'],
+      category: json['category'],
+      title: json['title'],
+      status: json['status'],
+      description: json['description'] ?? '',
+      location: json['location'] ?? '',
+      dateLostFound: json['date_lost_found'] ?? '',
+      imageUrl: json['image_url'],
+      timeCreated: json['time_created'] != null
+          ? DateTime.parse(json['time_created'])
+          : DateTime.now(),
     );
   }
 
-  // Optional: A method to convert the object back to JSON for sending data back to Supabase (e.g., when posting a new item)
+  // Convert from Dart object to JSON for Supabase
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'type': type,
+      'category': category,
       'title': title,
+      'status': status,
       'description': description,
+      'location': location,
+      'date_lost_found': dateLostFound,
       'image_url': imageUrl,
+      // time_created and time_updated are auto-handled by Supabase
     };
   }
 }
