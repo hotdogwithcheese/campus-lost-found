@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // IMPORTANT
+import '../config/supabase_config.dart';
 
 class PostItemScreen extends StatefulWidget {
   const PostItemScreen({super.key});
@@ -28,10 +30,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // Pick image from gallery or camera
+  // Select image
   Future<void> _pickImage(ImageSource source) async {
     final XFile? picked =
-    await _picker.pickImage(source: source, imageQuality: 80);
+    await _picker.pickImage(source: source, imageQuality: 75);
+
     if (picked != null) {
       setState(() {
         imageFile = File(picked.path);
@@ -39,35 +42,83 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
   }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      if (category == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a category')));
-        return;
-      }
-      if (imageFile == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select an image')));
-        return;
-      }
+  // Upload image to Supabase Storage
+  Future<String?> _uploadImage(File image) async {
+    try {
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
 
-      _formKey.currentState!.save();
+      final bucket = SupabaseConfig.client.storage.from('item-images');
 
-      // TODO: Submit to backend (Supabase)
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Form submitted! (Backend logic pending)')));
+      await bucket.upload(
+        fileName,
+        image,
+        fileOptions: const FileOptions(
+          upsert: false,
+          cacheControl: '3600',
+        ),
+      );
 
-      Navigator.of(context).pop(); // Back to feed
+      final imageUrl = bucket.getPublicUrl(fileName);
+      return imageUrl;
+    } catch (e) {
+      debugPrint("Upload error: $e");
+      return null;
     }
+  }
+
+  // Save to database
+  Future<void> _saveItem(String imageUrl) async {
+    await SupabaseConfig.client.from(SupabaseConfig.itemsTableName).insert({
+      'title': title,
+      'description': description,
+      'category': category,
+      'status': status,
+      'image_url': imageUrl,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // Submit button
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (imageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an image')),
+      );
+      return;
+    }
+
+    _formKey.currentState!.save();
+
+    // Upload image
+    final imageUrl = await _uploadImage(imageFile!);
+
+    if (imageUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload failed')),
+      );
+      return;
+    }
+
+    await _saveItem(imageUrl);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Item posted successfully')),
+    );
+
+    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Post Lost or Found Item'),
-      ),
+      appBar: AppBar(title: const Text('Post Lost or Found Item')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -78,9 +129,9 @@ class _PostItemScreenState extends State<PostItemScreen> {
               // Title
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Title'),
-                validator: (val) =>
-                val == null || val.isEmpty ? 'Title is required' : null,
-                onSaved: (val) => title = val,
+                validator: (v) =>
+                v == null || v.isEmpty ? 'Title is required' : null,
+                onSaved: (v) => title = v,
               ),
               const SizedBox(height: 12),
 
@@ -88,44 +139,45 @@ class _PostItemScreenState extends State<PostItemScreen> {
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Description'),
                 maxLines: 3,
-                validator: (val) =>
-                val == null || val.isEmpty ? 'Description is required' : null,
-                onSaved: (val) => description = val,
+                validator: (v) =>
+                v == null || v.isEmpty ? 'Description is required' : null,
+                onSaved: (v) => description = v,
               ),
               const SizedBox(height: 12),
 
-              // Category dropdown
+              // Category
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .map((c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(c),
+                ))
                     .toList(),
-                value: category,
-                onChanged: (val) => setState(() => category = val),
-                validator: (val) =>
-                val == null ? 'Please select a category' : null,
+                onChanged: (v) => setState(() => category = v),
+                validator: (v) =>
+                v == null ? 'Please select a category' : null,
               ),
               const SizedBox(height: 12),
 
-              // Status radio buttons
+              // Status (Lost/Found)
               Row(
                 children: [
-                  const Text('Status:'),
-                  const SizedBox(width: 12),
+                  const Text('Status:  '),
                   Expanded(
-                    child: RadioListTile<String>(
+                    child: RadioListTile(
                       title: const Text('Lost'),
                       value: 'lost',
                       groupValue: status,
-                      onChanged: (val) => setState(() => status = val!),
+                      onChanged: (v) => setState(() => status = v!),
                     ),
                   ),
                   Expanded(
-                    child: RadioListTile<String>(
+                    child: RadioListTile(
                       title: const Text('Found'),
                       value: 'found',
                       groupValue: status,
-                      onChanged: (val) => setState(() => status = val!),
+                      onChanged: (v) => setState(() => status = v!),
                     ),
                   ),
                 ],
@@ -137,7 +189,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                 children: [
                   ElevatedButton.icon(
                     onPressed: () => _pickImage(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library),
+                    icon: const Icon(Icons.photo),
                     label: const Text('Gallery'),
                   ),
                   const SizedBox(width: 12),
@@ -148,19 +200,37 @@ class _PostItemScreenState extends State<PostItemScreen> {
                   ),
                 ],
               ),
+
+              // Preview
               if (imageFile != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Image.file(imageFile!, height: 150),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.file(
+                      imageFile!,
+                      height: 160,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
+
               const SizedBox(height: 24),
 
-              // Submit button
+              // Submit
               ElevatedButton(
                 onPressed: _submitForm,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Submit', style: TextStyle(fontSize: 16)),
+                child: const SizedBox(
+                  width: double.infinity,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Text(
+                        'Submit',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
