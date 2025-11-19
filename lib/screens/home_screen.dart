@@ -1,73 +1,51 @@
 import 'package:flutter/material.dart';
+import 'feed_screen.dart'; // Import your feed screen
 
-// Import the screen you want to navigate to
-import 'post_item_screen.dart';
-
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-
-  // This function handles the navigation when the button is pressed
-  void _navigateToMainFeed() {
-    // 🎯 NOTE: Replace 'PostItemScreen()' with your actual main feed screen
-    // if it has a different name (e.g., MainFeedScreen()).
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => const PostItemScreen(),
-    ));
+  void _navigateToMainFeed(BuildContext context) {
+    // Replace HomeScreen with FeedScreen
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const FeedScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Campus Lost & Found'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo Image
+            // Logo
             Image.asset(
-              'assets/images/app_logo.png', // Ensure this path is correct
-              width: 500,
-              height: 200,
+              'assets/images/app_logo.png',
+              width: 300,
+              height: 150,
             ),
-
-            const SizedBox(height: 50), // Increased spacing
-
-            // App Name
+            const SizedBox(height: 40),
             const Text(
               'Campus Lost & Found',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: Colors.blue,
               ),
             ),
             const SizedBox(height: 10),
-
-            // Tagline
             const Text(
               'Find what\'s lost. Return what\'s found.',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 color: Colors.grey,
                 fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(height: 80), // Increased spacing before the button
-
-            // 🎯 FIXED: Replaced the "Coming Soon" container with a button
+            const SizedBox(height: 60),
             ElevatedButton.icon(
-              onPressed: _navigateToMainFeed,
+              onPressed: () => _navigateToMainFeed(context),
               icon: const Icon(Icons.arrow_forward_ios),
               label: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
