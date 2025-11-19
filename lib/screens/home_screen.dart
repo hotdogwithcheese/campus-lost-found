@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
-// Import the screen you want to navigate to
-import 'post_item_screen.dart';
+import 'feed_screen.dart'; // Import the FeedScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,13 +9,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
-  // This function handles the navigation when the button is pressed
   void _navigateToMainFeed() {
-    // 🎯 NOTE: Replace 'PostItemScreen()' with your actual main feed screen
-    // if it has a different name (e.g., MainFeedScreen()).
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => const PostItemScreen(),
+      builder: (_) => const FeedScreen(),
     ));
   }
 
@@ -36,13 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Logo Image
             Image.asset(
-              'assets/images/app_logo.png', // Ensure this path is correct
+              'assets/images/app_logo.png', // Make sure this exists
               width: 500,
               height: 200,
             ),
-
-            const SizedBox(height: 50), // Increased spacing
-
+            const SizedBox(height: 50),
             // App Name
             const Text(
               'Campus Lost & Found',
@@ -53,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
             // Tagline
             const Text(
               'Find what\'s lost. Return what\'s found.',
@@ -63,9 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(height: 80), // Increased spacing before the button
-
-            // 🎯 FIXED: Replaced the "Coming Soon" container with a button
+            const SizedBox(height: 80),
+            // Continue button
             ElevatedButton.icon(
               onPressed: _navigateToMainFeed,
               icon: const Icon(Icons.arrow_forward_ios),
