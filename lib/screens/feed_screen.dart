@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
-import 'post_item_screen.dart'; // Make sure this path is correct
+import 'post_item_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -17,8 +17,13 @@ class _FeedScreenState extends State<FeedScreen> {
 
   // Staff mode
   bool isStaff = false;
-  final String staffPin = "1234"; // placeholder PIN
+  final String staffPin = "1234";
   final TextEditingController _pinController = TextEditingController();
+
+  // Filters
+  String selectedStatus = 'All';
+  String selectedCategory = 'All';
+  List<String> categories = ['All', 'Electronics', 'Clothes', 'Documents']; // example categories
 
   @override
   void initState() {
@@ -32,7 +37,6 @@ class _FeedScreenState extends State<FeedScreen> {
         .from(SupabaseConfig.itemsTableName)
         .select()
         .order('created_at', ascending: false);
-
     setState(() {
       items = response;
       isLoading = false;
@@ -55,167 +59,197 @@ class _FeedScreenState extends State<FeedScreen> {
           controller: _pinController,
           obscureText: true,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Enter Staff PIN',
-          ),
+          decoration: const InputDecoration(labelText: 'Enter Staff PIN'),
         ),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (_pinController.text == staffPin) {
-                Navigator.pop(context, true);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Incorrect PIN')),
-                );
-              }
-            },
-            child: const Text('Enter'),
-          ),
+              onPressed: () {
+                if (_pinController.text == staffPin) Navigator.pop(context, true);
+                else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Incorrect PIN')),
+                  );
+                }
+              },
+              child: const Text('Enter')),
         ],
       ),
     );
 
     if (confirmed == true) {
-      setState(() {
-        isStaff = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Staff mode activated')),
-      );
+      setState(() => isStaff = true);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Staff mode activated')));
       _pinController.clear();
     }
   }
 
   void _navigateToPostItem() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PostItemScreen()),
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PostItemScreen()));
+    loadItems();
+  }
+
+  Widget _buildFilters() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          DropdownButton<String>(
+            value: selectedStatus,
+            items: ['All', 'Lost', 'Found', 'Claimed']
+                .map((status) => DropdownMenuItem(value: status, child: Text(status)))
+                .toList(),
+            onChanged: (value) => setState(() => selectedStatus = value!),
+          ),
+          const SizedBox(width: 12),
+          DropdownButton<String>(
+            value: selectedCategory,
+            items: categories
+                .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+                .toList(),
+            onChanged: (value) => setState(() => selectedCategory = value!),
+          ),
+        ],
+      ),
     );
-    loadItems(); // Refresh feed after posting
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredItems = items.where((item) {
+      final statusMatch = selectedStatus == 'All' ||
+          (selectedStatus == 'Claimed'
+              ? item['is_claimed'] == true
+              : item['status'].toString().toLowerCase() == selectedStatus.toLowerCase());
+      final categoryMatch =
+          selectedCategory == 'All' || item['category'] == selectedCategory;
+      return statusMatch && categoryMatch;
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Campus Lost & Found"),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings),
-            tooltip: 'Staff Access',
-            onPressed: _showStaffPinDialog,
-          ),
+          IconButton(icon: const Icon(Icons.admin_panel_settings), onPressed: _showStaffPinDialog),
         ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : items.isEmpty
-          ? const Center(child: Text("No items found"))
-          : GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 0.7,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-
-          return Card(
-            clipBehavior: Clip.hardEdge,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: item['image_url'] != null
-                      ? Image.network(item['image_url'], fit: BoxFit.cover)
-                      : const Icon(Icons.image_not_supported, size: 50),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Column(
-                    children: [
-                      Text(item['title'],
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(
-                        "${item['category']} • ${item['status'] == 'lost' ? 'Lost' : 'Found'}",
-                        style: const TextStyle(
-                            fontSize: 10, color: Colors.grey),
-                      ),
-                      if (item['is_claimed'] == true)
-                        const Chip(
-                          label: Text("Claimed"),
-                          backgroundColor: Colors.greenAccent,
-                        ),
-                      if (isStaff)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          : Column(
+        children: [
+          _buildFilters(),
+          Expanded(
+            child: filteredItems.isEmpty
+                ? const Center(child: Text("No items found"))
+                : GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 0.7),
+              itemCount: filteredItems.length,
+              itemBuilder: (context, index) {
+                final item = filteredItems[index];
+                return InkWell(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: Text(item['title']),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  textStyle: const TextStyle(fontSize: 10)),
-                              onPressed: () async {
-                                // Mark as claimed
-                                await supabase
-                                    .from(SupabaseConfig.itemsTableName)
-                                    .update({'is_claimed': true})
-                                    .eq('id', item['id']);
-                                setState(
-                                        () => items[index]['is_claimed'] = true);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                        Text('Item marked as claimed')));
-                              },
-                              child: const Text('Claimed'),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: Colors.red, size: 20),
-                              onPressed: () async {
-                                final confirmed =
-                                await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Delete item?'),
-                                    content: const Text(
-                                        'This action cannot be undone.'),
-                                    actions: [
-                                      TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text('Cancel')),
-                                      TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text('Delete')),
-                                    ],
-                                  ),
-                                );
-
-                                if (confirmed == true) {
-                                  await deleteItem(item['id'], index);
-                                }
-                              },
-                            ),
+                            if (item['image_url'] != null) Image.network(item['image_url']),
+                            const SizedBox(height: 8),
+                            Text('Category: ${item['category']}'),
+                            Text('Status: ${item['status'] == 'lost' ? 'Lost' : 'Found'}'),
+                            if (item['is_claimed'] == true) Text('Claimed'),
+                            const SizedBox(height: 8),
+                            Text('Description:'),
+                            Text(item['description'] ?? 'No description'),
                           ],
                         ),
-                    ],
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  child: Card(
+                    clipBehavior: Clip.hardEdge,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: item['image_url'] != null
+                              ? Image.network(item['image_url'], fit: BoxFit.cover)
+                              : const Icon(Icons.image_not_supported, size: 50),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Column(
+                            children: [
+                              Text(item['title'], maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(
+                                "${item['category']} • ${item['status'] == 'lost' ? 'Lost' : 'Found'}",
+                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              ),
+                              if (item['is_claimed'] == true)
+                                const Chip(label: Text("Claimed"), backgroundColor: Colors.greenAccent),
+                              if (isStaff)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          textStyle: const TextStyle(fontSize: 10)),
+                                      onPressed: () async {
+                                        await supabase
+                                            .from(SupabaseConfig.itemsTableName)
+                                            .update({'is_claimed': true})
+                                            .eq('id', item['id']);
+                                        setState(() => item['is_claimed'] = true);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Item marked as claimed')));
+                                      },
+                                      child: const Text('Claimed'),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                      onPressed: () async {
+                                        final confirmed = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => AlertDialog(
+                                            title: const Text('Delete item?'),
+                                            content: const Text('This action cannot be undone.'),
+                                            actions: [
+                                              TextButton(
+                                                  onPressed: () => Navigator.pop(context, false),
+                                                  child: const Text('Cancel')),
+                                              TextButton(
+                                                  onPressed: () => Navigator.pop(context, true),
+                                                  child: const Text('Delete')),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirmed == true) await deleteItem(item['id'], index);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToPostItem,

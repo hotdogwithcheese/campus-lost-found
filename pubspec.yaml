@@ -1,27 +1,27 @@
-name: campus_lost_found # This must match your project folder name
+name: campus_lost_found
 description: A mobile application for managing lost and found items on campus.
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.0 <4.0.0' # Updated for compatibility with your Flutter 3.38.1
+  sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  supabase_flutter: ^2.9.0 # Required for your supabase_service.dart file
+  supabase_flutter: ^2.10.3
   provider: ^6.0.0
-  image_picker: ^0.8.7+3
-  google_fonts: ^5.0.0
+  image_picker: ^1.2.1
+  google_fonts: ^6.3.2
   url_launcher: ^6.1.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
   flutter_native_splash: ^2.4.6
 
@@ -34,7 +34,7 @@ flutter_icons:
 
 flutter_native_splash:
   image: assets/images/app_logo.png
-  color: "#ffffff" # This sets the splash screen background to white
+  color: "#ffffff"
   android: true
   ios: true
 
