@@ -29,12 +29,12 @@ flutter_icons:
   android: true
   ios: true
   image_path: "assets/images/app_logo.png"
-  adaptive_icon_background: "#FFFCFCFC"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/images/app_logo.png"
 
 flutter_native_splash:
   image: assets/images/app_logo.png
-  color: "#ffffff"
+  color: "#FFFFFF"
   android: true
   ios: true
 
