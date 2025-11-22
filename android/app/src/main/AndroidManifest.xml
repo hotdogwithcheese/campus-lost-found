@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="campus_lost_found"
+        android:label="Campus Lost & Found"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
