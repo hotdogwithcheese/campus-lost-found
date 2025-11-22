@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // IMPORTANT
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
 class PostItemScreen extends StatefulWidget {
@@ -30,43 +30,27 @@ class _PostItemScreenState extends State<PostItemScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // Select image
   Future<void> _pickImage(ImageSource source) async {
     final XFile? picked =
     await _picker.pickImage(source: source, imageQuality: 75);
-
     if (picked != null) {
-      setState(() {
-        imageFile = File(picked.path);
-      });
+      setState(() => imageFile = File(picked.path));
     }
   }
 
-  // Upload image to Supabase Storage
   Future<String?> _uploadImage(File image) async {
     try {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
-
       final bucket = SupabaseConfig.client.storage.from('item-images');
-
-      await bucket.upload(
-        fileName,
-        image,
-        fileOptions: const FileOptions(
-          upsert: false,
-          cacheControl: '3600',
-        ),
-      );
-
-      final imageUrl = bucket.getPublicUrl(fileName);
-      return imageUrl;
+      await bucket.upload(fileName, image,
+          fileOptions: const FileOptions(upsert: false, cacheControl: '3600'));
+      return bucket.getPublicUrl(fileName);
     } catch (e) {
       debugPrint("Upload error: $e");
       return null;
     }
   }
 
-  // Save to database
   Future<void> _saveItem(String imageUrl) async {
     await SupabaseConfig.client.from(SupabaseConfig.itemsTableName).insert({
       'title': title,
@@ -78,7 +62,6 @@ class _PostItemScreenState extends State<PostItemScreen> {
     });
   }
 
-  // Submit button
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,7 +69,6 @@ class _PostItemScreenState extends State<PostItemScreen> {
       );
       return;
     }
-
     if (imageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an image')),
@@ -95,10 +77,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
 
     _formKey.currentState!.save();
-
-    // Upload image
     final imageUrl = await _uploadImage(imageFile!);
-
     if (imageUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image upload failed')),
@@ -107,11 +86,9 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
 
     await _saveItem(imageUrl);
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Item posted successfully')),
     );
-
     Navigator.pop(context, true);
   }
 
@@ -149,10 +126,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: categories
-                    .map((c) => DropdownMenuItem(
-                  value: c,
-                  child: Text(c),
-                ))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) => setState(() => category = v),
                 validator: (v) =>
@@ -160,7 +134,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Status (Lost/Found)
+              // Status
               Row(
                 children: [
                   const Text('Status:  '),
@@ -184,19 +158,27 @@ class _PostItemScreenState extends State<PostItemScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Image picker
+              // Image picker row (uniform buttons)
               Row(
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _pickImage(ImageSource.gallery),
-                    icon: const Icon(Icons.photo),
-                    label: const Text('Gallery'),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _pickImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo),
+                      label: const Text('Gallery'),
+                      style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14)),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _pickImage(ImageSource.camera),
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Camera'),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _pickImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Camera'),
+                      style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14)),
+                    ),
                   ),
                 ],
               ),
@@ -207,30 +189,23 @@ class _PostItemScreenState extends State<PostItemScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.file(
-                      imageFile!,
-                      height: 160,
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.file(imageFile!, height: 160, fit: BoxFit.cover),
                   ),
                 ),
 
               const SizedBox(height: 24),
 
-              // Submit
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: const SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Text(
-                        'Submit',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
+              // Submit button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor, // theme color
+                    foregroundColor: Colors.white, // text color
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
+                  child: const Text('Submit', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],
