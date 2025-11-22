@@ -1,18 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Add INTERNET permission if your app uses Firebase or APIs -->
+    <!-- INTERNET permission for Firebase/APIs -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="campus_lost_found"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:label="Campus Lost &amp; Found"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="true"
+        android:theme="@style/LaunchTheme">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -20,18 +21,19 @@
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme"
-                />
+                android:resource="@style/NormalTheme"/>
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
         </activity>
 
         <meta-data
             android:name="flutterEmbedding"
-            android:value="2" />
+            android:value="2"/>
+
     </application>
 
     <queries>
