@@ -1,4 +1,4 @@
-# Team Structure - Campus Lost & Found App
+# Team CL&F Structure - Campus Lost & Found App
 
 ## Team Members
 
@@ -6,7 +6,7 @@
 Responsibilities:
 - Repository management and Git coordination
 - Milestone planning and deadline tracking
-- Deployment to Netlify/APK (Milestone D)
+- Deployment to APK
 - Final integration and presentation preparation
 - Git: @diosantaemilyclaire-collab
 
@@ -33,7 +33,6 @@ Responsibilities:
 - Image picker integration
 - Form validation
 - Category dropdown
-- UI/UX polish
 - Git: @BlairKik
 
 ### Stephanie Diel - QA & Documentation
@@ -41,6 +40,6 @@ Responsibilities:
 - Testing all features (CRUD operations)
 - Bug identification and reporting
 - README.md documentation
-- User guide creation
+- Installations guide creation
 - Code review
 - Git: @staxiewuiz
