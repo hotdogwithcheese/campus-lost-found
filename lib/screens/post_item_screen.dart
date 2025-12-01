@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 import '../config/supabase_config.dart';
 
 class PostItemScreen extends StatefulWidget {
@@ -17,7 +19,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
   String? description;
   String? category;
   String status = 'lost';
-  File? imageFile;
+
+  // Image variables
+  File? imageFile;          // Mobile
+  Uint8List? imageBytes;    // Web
+  String? imageFileName;    // File name
 
   final List<String> categories = [
     'Electronics',
@@ -30,20 +36,62 @@ class _PostItemScreenState extends State<PostItemScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage(ImageSource source) async {
-    final XFile? picked =
-    await _picker.pickImage(source: source, imageQuality: 75);
-    if (picked != null) {
-      setState(() => imageFile = File(picked.path));
+  /// Pick image for mobile or web
+  Future<void> _pickImage() async {
+    if (kIsWeb) {
+      // Web file picker
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result != null) {
+        setState(() {
+          imageBytes = result.files.first.bytes;
+          imageFileName = result.files.first.name;
+        });
+      }
+    } else {
+      // Mobile gallery
+      final XFile? picked =
+      await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+      if (picked != null) {
+        setState(() {
+          imageFile = File(picked.path);
+          imageFileName = picked.name;
+        });
+      }
     }
   }
 
-  Future<String?> _uploadImage(File image) async {
+  /// Mobile-only camera picker
+  Future<void> _pickImageFromCamera() async {
+    if (!kIsWeb) {
+      final XFile? picked =
+      await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
+      if (picked != null) {
+        setState(() {
+          imageFile = File(picked.path);
+          imageFileName = picked.name;
+        });
+      }
+    }
+  }
+
+  /// Upload image to Supabase
+  Future<String?> _uploadImage() async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
       final bucket = SupabaseConfig.client.storage.from('item-images');
-      await bucket.upload(fileName, image,
-          fileOptions: const FileOptions(upsert: false, cacheControl: '3600'));
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFileName!}';
+
+      if (kIsWeb) {
+        // Web upload
+        await bucket.uploadBinary(fileName, imageBytes!);
+      } else {
+        // Mobile upload
+        await bucket.upload(fileName, imageFile!);
+      }
+
+      // ✅ Fix: getPublicUrl returns a string directly
       return bucket.getPublicUrl(fileName);
     } catch (e) {
       debugPrint("Upload error: $e");
@@ -51,6 +99,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
   }
 
+  /// Save item to Supabase DB
   Future<void> _saveItem(String imageUrl) async {
     await SupabaseConfig.client.from(SupabaseConfig.itemsTableName).insert({
       'title': title,
@@ -62,6 +111,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
     });
   }
 
+  /// Submit form
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,7 +119,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
       );
       return;
     }
-    if (imageFile == null) {
+    if (imageFile == null && imageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an image')),
       );
@@ -77,7 +127,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
     }
 
     _formKey.currentState!.save();
-    final imageUrl = await _uploadImage(imageFile!);
+    final imageUrl = await _uploadImage();
     if (imageUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image upload failed')),
@@ -94,7 +144,6 @@ class _PostItemScreenState extends State<PostItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Blue theme for Radio buttons
     final radioTheme = Theme.of(context).copyWith(
       radioTheme: RadioThemeData(
         fillColor: MaterialStateColor.resolveWith((states) => Colors.blue),
@@ -136,12 +185,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) => setState(() => category = v),
-                validator: (v) =>
-                v == null ? 'Please select a category' : null,
+                validator: (v) => v == null ? 'Please select a category' : null,
               ),
               const SizedBox(height: 12),
 
-              // Status (Lost / Found)
+              // Status
               Row(
                 children: [
                   const Text('Status:  '),
@@ -171,12 +219,12 @@ class _PostItemScreenState extends State<PostItemScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Image picker row
+              // Image picker buttons
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _pickImage(ImageSource.gallery),
+                      onPressed: _pickImage,
                       icon: const Icon(Icons.photo),
                       label: const Text('Gallery'),
                       style: ElevatedButton.styleFrom(
@@ -186,30 +234,35 @@ class _PostItemScreenState extends State<PostItemScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _pickImage(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Camera'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+
+                  // Only show camera button on mobile
+                  if (!kIsWeb) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _pickImageFromCamera,
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Camera'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
 
               // Image preview
-              if (imageFile != null)
+              if (imageFile != null || imageBytes != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child:
-                    Image.file(imageFile!, height: 160, fit: BoxFit.cover),
+                    child: kIsWeb
+                        ? Image.memory(imageBytes!, height: 160, fit: BoxFit.cover)
+                        : Image.file(imageFile!, height: 160, fit: BoxFit.cover),
                   ),
                 ),
 
@@ -225,8 +278,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child:
-                  const Text('Submit', style: TextStyle(fontSize: 16)),
+                  child: const Text('Submit', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import '../config/supabase_config.dart';
 import 'post_item_screen.dart';
 import 'item_detail_screen.dart';
@@ -17,7 +16,7 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final supabase = SupabaseConfig.client;
   bool isLoading = true;
-  List<dynamic> items = [];
+  List<Map<String, dynamic>> items = [];
 
   bool isStaff = false;
   final String staffPin = "1234";
@@ -44,50 +43,28 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> loadItems() async {
     setState(() => isLoading = true);
 
-    final prefs = await SharedPreferences.getInstance();
-    bool hasInternet = false;
-
-    // ✅ Real internet check
     try {
-      final result = await http.get(Uri.parse('https://google.com')).timeout(const Duration(seconds: 5));
-      hasInternet = result.statusCode == 200;
-    } catch (_) {
-      hasInternet = false;
-    }
+      final response = await supabase
+          .from(SupabaseConfig.itemsTableName)
+          .select()
+          .order('created_at', ascending: false);
 
-    if (hasInternet) {
-      try {
-        final response = await supabase
-            .from(SupabaseConfig.itemsTableName)
-            .select()
-            .order('created_at', ascending: false);
-
-        if (response != null) {
-          items = List.from(response);
-          await prefs.setString('cached_items', jsonEncode(items));
-        }
-      } catch (_) {
-        hasInternet = false;
-      }
-    }
-
-    if (!hasInternet) {
-      final cached = prefs.getString('cached_items');
-      if (cached != null) {
-        items = jsonDecode(cached);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Offline mode: showing cached items')),
-          );
-        });
+      if (response != null && response is List) {
+        items = response.map((e) => Map<String, dynamic>.from(e)).toList();
       } else {
         items = [];
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to load items')),
-          );
-        });
       }
+    } catch (e) {
+      debugPrint("Supabase fetch error: $e");
+      items = [];
+    }
+
+    if (items.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load items')),
+        );
+      });
     }
 
     setState(() => isLoading = false);
