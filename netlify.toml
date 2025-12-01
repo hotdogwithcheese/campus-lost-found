@@ -1,0 +1,14 @@
+[build]
+# Command to build your Flutter web project
+command = "flutter build web"
+
+# Folder to publish
+publish = "build/web"
+
+[build.environment]
+# Specify Flutter version
+FLUTTER_VERSION = "3.38.2"
+
+[context.production.environment]
+# You can also override environment variables for production
+FLUTTER_VERSION = "3.38.2"
