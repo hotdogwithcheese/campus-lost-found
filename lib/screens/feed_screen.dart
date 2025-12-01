@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import '../config/supabase_config.dart';
 import 'post_item_screen.dart';
 import 'item_detail_screen.dart';
@@ -25,7 +25,15 @@ class _FeedScreenState extends State<FeedScreen> {
 
   String selectedStatus = 'All';
   String selectedCategory = 'All';
-  final List<String> categories = ['All', 'Electronics', 'Bags', 'Books', 'Clothing', 'Accessories', 'Others'];
+  final List<String> categories = [
+    'All',
+    'Electronics',
+    'Bags',
+    'Books',
+    'Clothing',
+    'Accessories',
+    'Others'
+  ];
 
   @override
   void initState() {
@@ -35,9 +43,17 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> loadItems() async {
     setState(() => isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
-    final connectivityResult = await Connectivity().checkConnectivity();
-    bool hasInternet = connectivityResult != ConnectivityResult.none;
+    bool hasInternet = false;
+
+    // ✅ Real internet check
+    try {
+      final result = await http.get(Uri.parse('https://google.com')).timeout(const Duration(seconds: 5));
+      hasInternet = result.statusCode == 200;
+    } catch (_) {
+      hasInternet = false;
+    }
 
     if (hasInternet) {
       try {
@@ -47,10 +63,10 @@ class _FeedScreenState extends State<FeedScreen> {
             .order('created_at', ascending: false);
 
         if (response != null) {
-          items = response as List<dynamic>;
+          items = List.from(response);
           await prefs.setString('cached_items', jsonEncode(items));
         }
-      } catch (e) {
+      } catch (_) {
         hasInternet = false;
       }
     }
@@ -58,7 +74,7 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!hasInternet) {
       final cached = prefs.getString('cached_items');
       if (cached != null) {
-        items = jsonDecode(cached) as List<dynamic>;
+        items = jsonDecode(cached);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Offline mode: showing cached items')),
@@ -92,9 +108,12 @@ class _FeedScreenState extends State<FeedScreen> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              if (_pinController.text == staffPin) Navigator.pop(context, true);
-              else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
+              if (_pinController.text == staffPin) {
+                Navigator.pop(context, true);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Incorrect PIN')),
+                );
               }
             },
             child: const Text('Enter'),
@@ -105,9 +124,12 @@ class _FeedScreenState extends State<FeedScreen> {
 
     if (confirmed == true) {
       setState(() => isStaff = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff mode activated')));
-      _pinController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Staff mode activated')),
+      );
     }
+
+    _pinController.clear();
   }
 
   void _openFilterModal() {
@@ -123,10 +145,9 @@ class _FeedScreenState extends State<FeedScreen> {
             Wrap(
               spacing: 8,
               children: ['All', 'Lost', 'Found', 'Claimed'].map((s) {
-                final sel = s == selectedStatus;
                 return ChoiceChip(
                   label: Text(s),
-                  selected: sel,
+                  selected: s == selectedStatus,
                   onSelected: (_) => setState(() => selectedStatus = s),
                   selectedColor: Colors.blue,
                 );
@@ -137,10 +158,9 @@ class _FeedScreenState extends State<FeedScreen> {
             Wrap(
               spacing: 8,
               children: categories.map((c) {
-                final sel = c == selectedCategory;
                 return ChoiceChip(
                   label: Text(c),
-                  selected: sel,
+                  selected: c == selectedCategory,
                   onSelected: (_) => setState(() => selectedCategory = c),
                   selectedColor: Colors.blue,
                 );
@@ -158,7 +178,10 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _navigateToPostItem() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PostItemScreen()));
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PostItemScreen()),
+    );
     await loadItems();
   }
 
@@ -175,9 +198,13 @@ class _FeedScreenState extends State<FeedScreen> {
       final statusMatch = selectedStatus == 'All' ||
           (selectedStatus == 'Claimed'
               ? item['is_claimed'] == true
-              : item['status']?.toString().toLowerCase() == selectedStatus.toLowerCase());
+              : item['status']?.toString().toLowerCase() ==
+              selectedStatus.toLowerCase());
+
       final categoryMatch = selectedCategory == 'All' ||
-          (item['category']?.toString().trim().toLowerCase() == selectedCategory.toLowerCase());
+          item['category']?.toString().trim().toLowerCase() ==
+              selectedCategory.toLowerCase();
+
       return statusMatch && categoryMatch;
     }).toList();
 
@@ -193,8 +220,9 @@ class _FeedScreenState extends State<FeedScreen> {
             TextButton(
               onPressed: () {
                 setState(() => isStaff = false);
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('Exited staff mode')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Exited staff mode')),
+                );
               },
               child: const Text('Exit', style: TextStyle(color: Colors.white)),
             ),
@@ -228,7 +256,9 @@ class _FeedScreenState extends State<FeedScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: selectedCategory,
-                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    items: categories
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
                     onChanged: (v) => setState(() => selectedCategory = v!),
                     decoration: const InputDecoration(
                       isDense: true,
@@ -265,21 +295,29 @@ class _FeedScreenState extends State<FeedScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ItemDetailScreen(item: item, isStaff: isStaff),
+                          builder: (_) => ItemDetailScreen(
+                            item: item,
+                            isStaff: isStaff,
+                          ),
                         ),
                       );
                       await loadItems();
                     },
                     child: Card(
                       clipBehavior: Clip.hardEdge,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
                             flex: 8,
                             child: item['image_url'] != null
-                                ? Image.network(item['image_url'], fit: BoxFit.cover)
+                                ? Image.network(
+                              item['image_url'],
+                              fit: BoxFit.cover,
+                            )
                                 : Container(
                               color: Colors.grey.shade200,
                               child: const Icon(Icons.image_not_supported, size: 50),

@@ -7,7 +7,12 @@ import '../config/supabase_config.dart';
 class ItemDetailScreen extends StatefulWidget {
   final dynamic item;
   final bool isStaff;
-  const ItemDetailScreen({super.key, required this.item, required this.isStaff});
+
+  const ItemDetailScreen({
+    super.key,
+    required this.item,
+    required this.isStaff,
+  });
 
   @override
   State<ItemDetailScreen> createState() => _ItemDetailScreenState();
@@ -28,7 +33,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     if (!widget.isStaff) return;
 
     setState(() => isLoading = true);
-    final wantClaim = !(currentItem['is_claimed'] == true);
 
     try {
       await supabase.rpc('staff_action', params: {
@@ -37,7 +41,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         'item_id': currentItem['id'],
       });
 
-      setState(() => currentItem['is_claimed'] = wantClaim);
+      final updated = await supabase
+          .from('items')
+          .select()
+          .eq('id', currentItem['id'])
+          .single();
+
+      setState(() => currentItem = updated);
 
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('cached_items');
@@ -45,16 +55,21 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         final list = jsonDecode(cached) as List<dynamic>;
         final idx = list.indexWhere((e) => e['id'] == currentItem['id']);
         if (idx >= 0) {
-          list[idx]['is_claimed'] = wantClaim;
+          list[idx] = updated;
           await prefs.setString('cached_items', jsonEncode(list));
         }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(wantClaim ? 'Item marked as claimed' : 'Item unclaimed')),
+        SnackBar(
+          content: Text(
+            updated['is_claimed'] == true ? 'Item marked as claimed' : 'Item unclaimed',
+          ),
+        ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       setState(() => isLoading = false);
     }
@@ -86,10 +101,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         'item_id': currentItem['id'],
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Item deleted')),
+      );
+
       Navigator.pop(context, true);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       setState(() => isLoading = false);
     }
@@ -101,7 +120,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(item['title'] ?? 'Item Detail', style: const TextStyle(color: Colors.white)),
+        title: Text(
+          item['title'] ?? 'Item Detail',
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.blue,
       ),
       body: Center(
@@ -113,7 +135,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
@@ -132,14 +153,22 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(item['title'] ?? '', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  Text(
+                    item['title'] ?? '',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 8),
                   Text("Category: ${item['category'] ?? 'N/A'}", style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 4),
                   Text("Status: ${item['status'] == 'lost' ? 'Lost' : 'Found'}", style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 4),
                   if (item['is_claimed'] == true)
-                    const Chip(label: Text("Claimed"), backgroundColor: Colors.green, labelStyle: TextStyle(color: Colors.white, fontSize: 12)),
+                    const Chip(
+                      label: Text("Claimed"),
+                      backgroundColor: Colors.green,
+                      labelStyle: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
                   const SizedBox(height: 16),
                   Align(alignment: Alignment.centerLeft, child: Text('Description:', style: const TextStyle(fontWeight: FontWeight.bold))),
                   const SizedBox(height: 8),
