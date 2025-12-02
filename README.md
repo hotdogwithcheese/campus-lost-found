@@ -2,6 +2,10 @@
 
 A Flutter app to help students post and find lost items on campus.
 
+Web Version
+- Hosted on Netlify:
+- https://campuslost-found.netlify.app/
+
 ## Feature
 - Post lost/found items with images
 
